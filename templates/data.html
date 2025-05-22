@@ -1,0 +1,381 @@
+{% extends "layout.html" %}
+
+{% block title %}Data - Water Quality Monitoring{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Data Explorer</h1>
+        <div class="text-sm text-gray-500">
+            Last updated: {{ now().strftime('%Y-%m-%d %H:%M') }}
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+            <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600" 
+                    data-target="meter-readings-tab">
+                Meter Readings
+            </button>
+            <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" 
+                    data-target="rainfall-tab">
+                Rainfall Data
+            </button>
+            <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" 
+                    data-target="merged-tab">
+                Merged Analysis
+            </button>
+        </nav>
+    </div>
+
+    <!-- Tabs Content -->
+    <div>
+        <!-- Meter Readings Tab -->
+        <div id="meter-readings-tab" class="tab-content">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="p-4 flex justify-between items-center border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800">Meter Readings</h3>
+                    <div class="flex space-x-2">
+                        <input type="text" id="meter-search" placeholder="Search..." 
+                               class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <button type="button" id="meter-refresh" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-sync-alt mr-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meter ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reading Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consumption (m³)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="meter-readings-table">
+                            {% if readings %}
+                                {% for reading in readings %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ reading.meter_id }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ reading.reading_date }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ reading.consumption }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ reading.location_name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if reading.consumption < 5 or reading.consumption > 50 %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Anomaly
+                                            </span>
+                                        {% else %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                Normal
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        No meter readings available
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bg-gray-50 px-4 py-3 flex justify-between items-center border-t border-gray-200">
+                    <div class="text-sm text-gray-700">
+                        Showing <span id="meter-count">{{ readings|length if readings else 0 }}</span> results
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </button>
+                        <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rainfall Data Tab -->
+        <div id="rainfall-tab" class="tab-content hidden">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="p-4 flex justify-between items-center border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800">Rainfall Data</h3>
+                    <div class="flex space-x-2">
+                        <input type="text" id="rainfall-search" placeholder="Search..." 
+                               class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <button type="button" id="rainfall-refresh" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-sync-alt mr-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rainfall (mm)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="rainfall-table">
+                            {% if rainfall_data %}
+                                {% for record in rainfall_data %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ record.date }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ record.rainfall }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if record.rainfall > 10 %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                Heavy
+                                            </span>
+                                        {% elif record.rainfall > 2 %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-50 text-blue-600">
+                                                Moderate
+                                            </span>
+                                        {% elif record.rainfall > 0 %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                Light
+                                            </span>
+                                        {% else %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                Dry
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        No rainfall data available
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bg-gray-50 px-4 py-3 flex justify-between items-center border-t border-gray-200">
+                    <div class="text-sm text-gray-700">
+                        Showing <span id="rainfall-count">{{ rainfall_data|length if rainfall_data else 0 }}</span> results
+                    </div>
+                    <div class="flex space-x-2">
+                        <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </button>
+                        <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merged Analysis Tab -->
+        <div id="merged-tab" class="tab-content hidden">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="p-4 flex justify-between items-center border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800">Merged Analysis by Dekad Period</h3>
+                    <div class="flex space-x-2">
+                        <button type="button" id="merged-refresh" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-sync-alt mr-2"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dekad Period</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Consumption (m³)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Consumption (m³)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Rainfall (mm)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Rainfall (mm)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="merged-table">
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                    Loading merged analysis data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bg-gray-50 px-4 py-3 flex justify-between items-center border-t border-gray-200">
+                    <div class="text-sm text-gray-700">
+                        Showing <span id="merged-count">0</span> results
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const target = this.dataset.target;
+                
+                // Update tab buttons
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'text-blue-600');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                });
+                
+                this.classList.remove('border-transparent', 'text-gray-500');
+                this.classList.add('border-blue-500', 'text-blue-600');
+                
+                // Update tab contents
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                document.getElementById(target).classList.remove('hidden');
+                
+                // Load data for the merged tab when selected
+                if (target === 'merged-tab') {
+                    loadMergedData();
+                }
+            });
+        });
+        
+        // Search functionality for meter readings
+        document.getElementById('meter-search').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#meter-readings-table tr:not(:first-child)');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(searchTerm);
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) visibleCount++;
+            });
+            
+            document.getElementById('meter-count').textContent = visibleCount;
+        });
+        
+        // Search functionality for rainfall data
+        document.getElementById('rainfall-search').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#rainfall-table tr:not(:first-child)');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(searchTerm);
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) visibleCount++;
+            });
+            
+            document.getElementById('rainfall-count').textContent = visibleCount;
+        });
+        
+        // Refresh buttons
+        document.getElementById('meter-refresh').addEventListener('click', function() {
+            // In a real app, you'd fetch fresh data here
+            alert('Refreshing meter readings data...');
+        });
+        
+        document.getElementById('rainfall-refresh').addEventListener('click', function() {
+            // In a real app, you'd fetch fresh data here
+            alert('Refreshing rainfall data...');
+        });
+        
+        document.getElementById('merged-refresh').addEventListener('click', function() {
+            loadMergedData();
+        });
+    });
+    
+    // Load merged data
+    function loadMergedData() {
+        const tableBody = document.getElementById('merged-table');
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Loading merged analysis data...
+                </td>
+            </tr>
+        `;
+        
+        fetch('/api/consumption-rainfall')
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    let tableHtml = '';
+                    
+                    data.forEach(item => {
+                        const isAnomaly = item.is_anomaly === true;
+                        
+                        tableHtml += `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.dekad_period || '--'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.total_consumption ? item.total_consumption.toFixed(2) : '--'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.avg_consumption ? item.avg_consumption.toFixed(2) : '--'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.total_rainfall ? item.total_rainfall.toFixed(2) : '--'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.avg_rainfall ? item.avg_rainfall.toFixed(2) : '--'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    ${isAnomaly ? 
+                                        `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                            Anomaly
+                                        </span>` : 
+                                        `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Normal
+                                        </span>`
+                                    }
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableBody.innerHTML = tableHtml;
+                    document.getElementById('merged-count').textContent = data.length;
+                } else {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                No merged analysis data available
+                            </td>
+                        </tr>
+                    `;
+                    document.getElementById('merged-count').textContent = '0';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching merged data:', error);
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-sm text-red-500">
+                            Error loading data. Please try again.
+                        </td>
+                    </tr>
+                `;
+            });
+    }
+</script>
+{% endblock %}

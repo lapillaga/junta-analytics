@@ -1,0 +1,56 @@
+.idea/
+.vscode/
+__pycache__/
+dist/
+.coverage*
+htmlcov/
+.tox/
+docs/_build/
+
+# Virtual environment
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite3
+
+# Byte-compiled files
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+build/
+dist/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Models (excluding subdirectories)
+/models/*.pkl
+
+# Data files (excluding subdirectories)
+/data/processed/*
+/data/raw/*
+!/data/raw/rainfall_data.csv
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Logs
+*.log
+
+# MacOS
+.DS_Store
+
+# Docker volumes
+postgres_data/

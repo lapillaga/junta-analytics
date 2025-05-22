@@ -1,0 +1,162 @@
+/* Custom styles for Junta Analytics */
+
+/* General utility classes that extend Tailwind */
+.chart-container {
+    min-height: 400px;
+    position: relative;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .page-break {
+        page-break-before: always;
+    }
+}
+
+/* Custom styles for select elements */
+select.custom-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    appearance: none;
+}
+
+/* Custom styles for data table alternating rows */
+.data-table tbody tr:nth-child(odd) {
+    background-color: rgba(243, 244, 246, 0.5);
+}
+
+.data-table tbody tr:hover {
+    background-color: rgba(236, 253, 245, 0.6);
+}
+
+/* Custom styles for form elements */
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Toast notification styles */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    opacity: 0;
+    transform: translateY(-100%);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.success {
+    background-color: #DEF7EC;
+    color: #03543E;
+    border-left: 4px solid #0F766E;
+}
+
+.toast.error {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    border-left: 4px solid #DC2626;
+}
+
+.toast.info {
+    background-color: #E0F2FE;
+    color: #0369A1;
+    border-left: 4px solid #0EA5E9;
+}
+
+/* Loading indicator */
+.loading-indicator {
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.loading-indicator div {
+    box-sizing: border-box;
+    display: block;
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    margin: 8px;
+    border: 8px solid #3B82F6;
+    border-radius: 50%;
+    animation: loading-indicator 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    border-color: #3B82F6 transparent transparent transparent;
+}
+
+.loading-indicator div:nth-child(1) {
+    animation-delay: -0.45s;
+}
+
+.loading-indicator div:nth-child(2) {
+    animation-delay: -0.3s;
+}
+
+.loading-indicator div:nth-child(3) {
+    animation-delay: -0.15s;
+}
+
+@keyframes loading-indicator {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,235 @@
+{% extends "layout.html" %}
+
+{% block title %}Check Consumption - Water Quality Monitoring{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Check Water Consumption</h1>
+    </div>
+    
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="p-6">
+            <h2 class="text-lg font-medium text-gray-800 mb-4">Validate Consumption Values</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Form -->
+                <div>
+                    <form method="POST" action="{{ url_for('main.check_consumption') }}">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="consumption" class="block text-sm font-medium text-gray-700">Consumption (m³)</label>
+                                <input type="number" step="0.01" id="consumption" name="consumption" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       value="{{ consumption if consumption is not none }}">
+                                <p class="mt-1 text-sm text-gray-500">Enter the water consumption value in cubic meters.</p>
+                            </div>
+                            
+                            <div>
+                                <label for="rainfall" class="block text-sm font-medium text-gray-700">Recent Rainfall (mm, optional)</label>
+                                <input type="number" step="0.01" id="rainfall" name="rainfall"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       value="{{ rainfall if rainfall is not none }}">
+                                <p class="mt-1 text-sm text-gray-500">Enter recent rainfall in millimeters (optional).</p>
+                            </div>
+                            
+                            <div class="pt-4">
+                                <button type="submit"
+                                        class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    Check Consumption
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Result Card -->
+                <div>
+                    {% if result %}
+                        <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                <h3 class="text-lg font-medium text-gray-800">Analysis Result</h3>
+                            </div>
+                            
+                            <div class="p-6">
+                                {% if result.is_anomaly %}
+                                    <div class="rounded-md bg-red-50 p-4 mb-4">
+                                        <div class="flex">
+                                            <div class="flex-shrink-0">
+                                                <i class="fas fa-exclamation-circle text-red-400 text-lg"></i>
+                                            </div>
+                                            <div class="ml-3">
+                                                <h3 class="text-sm font-medium text-red-800">Anomalous Consumption Detected</h3>
+                                                <div class="mt-2 text-sm text-red-700">
+                                                    <p>
+                                                        The consumption value of {{ consumption }} m³ is outside the expected normal range.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="rounded-md bg-green-50 p-4 mb-4">
+                                        <div class="flex">
+                                            <div class="flex-shrink-0">
+                                                <i class="fas fa-check-circle text-green-400 text-lg"></i>
+                                            </div>
+                                            <div class="ml-3">
+                                                <h3 class="text-sm font-medium text-green-800">Normal Consumption</h3>
+                                                <div class="mt-2 text-sm text-green-700">
+                                                    <p>
+                                                        The consumption value of {{ consumption }} m³ is within the expected normal range.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-800 mb-2">Details</h4>
+                                    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                                        <div class="sm:col-span-1">
+                                            <dt class="text-sm font-medium text-gray-500">Consumption</dt>
+                                            <dd class="mt-1 text-sm text-gray-900">{{ consumption }} m³</dd>
+                                        </div>
+                                        <div class="sm:col-span-1">
+                                            <dt class="text-sm font-medium text-gray-500">Rainfall</dt>
+                                            <dd class="mt-1 text-sm text-gray-900">{{ rainfall|default('Not provided', true) }} {% if rainfall %}mm{% endif %}</dd>
+                                        </div>
+                                        <div class="sm:col-span-1">
+                                            <dt class="text-sm font-medium text-gray-500">Analysis Method</dt>
+                                            <dd class="mt-1 text-sm text-gray-900">{{ result.method|capitalize }}</dd>
+                                        </div>
+                                        <div class="sm:col-span-1">
+                                            <dt class="text-sm font-medium text-gray-500">Result</dt>
+                                            <dd class="mt-1 text-sm {% if result.is_anomaly %}text-red-600{% else %}text-green-600{% endif %}">
+                                                {{ 'Anomaly' if result.is_anomaly else 'Normal' }}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="bg-gray-50 rounded-lg border border-gray-200 p-6 flex flex-col items-center justify-center h-full">
+                            <div class="text-center">
+                                <i class="fas fa-tint text-blue-400 text-4xl mb-3"></i>
+                                <h3 class="text-lg font-medium text-gray-800 mb-2">Water Consumption Check</h3>
+                                <p class="text-sm text-gray-600">
+                                    Enter a consumption value to check if it falls within the expected range or could be an anomaly.
+                                </p>
+                            </div>
+                            
+                            <div class="mt-6 text-sm text-gray-500">
+                                <p class="flex items-center">
+                                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                                    The system will analyze the value using our trained model.
+                                </p>
+                                <p class="flex items-center mt-2">
+                                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                                    Adding rainfall data improves prediction accuracy.
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Explanation Section -->
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="p-6">
+            <h2 class="text-lg font-medium text-gray-800 mb-4">About Water Consumption Validation</h2>
+            
+            <div class="prose max-w-none">
+                <p>
+                    Our system analyzes water consumption data to identify potential anomalies. Anomalies might indicate:
+                </p>
+                
+                <ul class="mt-2">
+                    <li>Meter reading errors</li>
+                    <li>Water leaks in the distribution system</li>
+                    <li>Unusual consumption patterns</li>
+                    <li>Potential water quality issues</li>
+                </ul>
+                
+                <p class="mt-4">
+                    The system uses two methods to detect anomalies:
+                </p>
+                
+                <dl class="mt-2">
+                    <dt class="font-medium">Rule-based validation</dt>
+                    <dd class="ml-4">
+                        Checks if the consumption value falls outside the predefined normal range 
+                        ({{ config.WATER_PARAMETERS.consumption.min }} - {{ config.WATER_PARAMETERS.consumption.max }} m³).
+                    </dd>
+                    
+                    <dt class="font-medium mt-2">Machine learning model</dt>
+                    <dd class="ml-4">
+                        Uses an Isolation Forest algorithm trained on historical consumption and rainfall data to detect anomalies.
+                        This model considers seasonal patterns and context to provide more accurate results.
+                    </dd>
+                </dl>
+                
+                <div class="bg-gray-50 p-4 rounded-lg mt-4">
+                    <h3 class="text-base font-medium">Normal consumption range</h3>
+                    <p class="text-sm mt-1">
+                        {{ config.WATER_PARAMETERS.consumption.min }} - {{ config.WATER_PARAMETERS.consumption.max }} cubic meters (m³)
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Form validation
+        const form = document.querySelector('form');
+        const consumptionInput = document.getElementById('consumption');
+        
+        form.addEventListener('submit', function(event) {
+            let isValid = true;
+            
+            // Check if consumption is provided and is a positive number
+            if (!consumptionInput.value || parseFloat(consumptionInput.value) < 0) {
+                isValid = false;
+                consumptionInput.classList.add('border-red-500');
+                
+                // Add error message if it doesn't exist
+                if (!document.getElementById('consumption-error')) {
+                    const errorMessage = document.createElement('p');
+                    errorMessage.id = 'consumption-error';
+                    errorMessage.className = 'mt-1 text-sm text-red-600';
+                    errorMessage.textContent = 'Please enter a valid consumption value (must be 0 or positive).';
+                    consumptionInput.parentNode.appendChild(errorMessage);
+                }
+            } else {
+                consumptionInput.classList.remove('border-red-500');
+                const errorMessage = document.getElementById('consumption-error');
+                if (errorMessage) {
+                    errorMessage.remove();
+                }
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+            }
+        });
+        
+        // Clear error styling on input
+        consumptionInput.addEventListener('input', function() {
+            this.classList.remove('border-red-500');
+            const errorMessage = document.getElementById('consumption-error');
+            if (errorMessage) {
+                errorMessage.remove();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,314 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - Water Quality Monitoring{% endblock %}
+
+{% block head %}
+<style>
+    .chart-container {
+        min-height: 400px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Water Quality Monitoring Dashboard</h1>
+        <div class="text-sm text-gray-500">
+            Last updated: {{ now().strftime('%Y-%m-%d %H:%M') }}
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Consumption</p>
+                    <p class="text-2xl font-bold text-blue-600">
+                        <span id="total-consumption">--</span> m³
+                    </p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-full">
+                    <i class="fas fa-tint text-blue-600"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-500">
+                    <span id="consumption-trend">--</span> since last period
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Average Rainfall</p>
+                    <p class="text-2xl font-bold text-green-600">
+                        <span id="avg-rainfall">--</span> mm
+                    </p>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full">
+                    <i class="fas fa-cloud-rain text-green-600"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-500">
+                    <span id="rainfall-trend">--</span> since last period
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Anomalies Detected</p>
+                    <p class="text-2xl font-bold text-red-600">
+                        <span id="anomalies-count">--</span>
+                    </p>
+                </div>
+                <div class="bg-red-100 p-3 rounded-full">
+                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-500">
+                    <span id="anomalies-percentage">--</span>% of all data points
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Consumption vs Rainfall Chart -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-lg font-medium text-gray-800 mb-4">Consumption vs Rainfall</h2>
+            <div id="consumption-rainfall-chart" class="chart-container"></div>
+        </div>
+
+        <!-- Consumption Range Chart -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-lg font-medium text-gray-800 mb-4">Consumption: Actual vs Expected Range</h2>
+            <div id="consumption-range-chart" class="chart-container"></div>
+        </div>
+    </div>
+
+    <!-- Correlation Heatmap -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-lg font-medium text-gray-800 mb-4">Correlation Between Consumption and Rainfall</h2>
+        <div id="correlation-chart" class="chart-container"></div>
+    </div>
+
+    <!-- Check Consumption Widget -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-lg font-medium text-gray-800 mb-4">Quick Consumption Check</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="col-span-2">
+                <div class="flex space-x-4">
+                    <div class="flex-1">
+                        <label for="quick-check-consumption" class="block text-sm font-medium text-gray-700">Consumption (m³)</label>
+                        <input type="number" id="quick-check-consumption" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="flex-1">
+                        <label for="quick-check-rainfall" class="block text-sm font-medium text-gray-700">Rainfall (mm, optional)</label>
+                        <input type="number" id="quick-check-rainfall" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="quick-check-button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Check Consumption
+                    </button>
+                </div>
+            </div>
+            <div>
+                <div id="quick-check-result" class="hidden p-4 rounded-lg">
+                    <p class="text-lg font-medium" id="result-message"></p>
+                    <p class="text-sm text-gray-600 mt-2" id="result-details"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Parse the chart data from the server
+    const consumptionRainfallData = {{ consumption_rainfall_chart|safe }};
+    const consumptionRangeData = {{ consumption_range_chart|safe }};
+    const correlationData = {{ correlation_chart|safe }};
+
+    // Function to load charts
+    function loadCharts() {
+        // Consumption vs Rainfall Chart
+        if (consumptionRainfallData && Object.keys(consumptionRainfallData).length > 0) {
+            Plotly.newPlot('consumption-rainfall-chart', 
+                JSON.parse(consumptionRainfallData).data, 
+                JSON.parse(consumptionRainfallData).layout
+            );
+        } else {
+            document.getElementById('consumption-rainfall-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-full text-gray-500">' +
+                '<p>No data available to display chart</p>' +
+                '</div>';
+        }
+
+        // Consumption Range Chart
+        if (consumptionRangeData && Object.keys(consumptionRangeData).length > 0) {
+            Plotly.newPlot('consumption-range-chart', 
+                JSON.parse(consumptionRangeData).data, 
+                JSON.parse(consumptionRangeData).layout
+            );
+        } else {
+            document.getElementById('consumption-range-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-full text-gray-500">' +
+                '<p>No data available to display chart</p>' +
+                '</div>';
+        }
+
+        // Correlation Heatmap
+        if (correlationData && Object.keys(correlationData).length > 0) {
+            Plotly.newPlot('correlation-chart', 
+                JSON.parse(correlationData).data, 
+                JSON.parse(correlationData).layout
+            );
+        } else {
+            document.getElementById('correlation-chart').innerHTML = 
+                '<div class="flex items-center justify-center h-full text-gray-500">' +
+                '<p>No data available to display chart</p>' +
+                '</div>';
+        }
+    }
+
+    // Load and update summary data
+    function loadSummaryData() {
+        fetch('/api/consumption-rainfall')
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    // Get the latest data
+                    const latest = data[data.length - 1];
+                    const previous = data.length > 1 ? data[data.length - 2] : null;
+                    
+                    // Update total consumption
+                    document.getElementById('total-consumption').textContent = 
+                        latest.total_consumption ? latest.total_consumption.toFixed(1) : '--';
+                    
+                    // Update average rainfall
+                    document.getElementById('avg-rainfall').textContent = 
+                        latest.avg_rainfall ? latest.avg_rainfall.toFixed(1) : '--';
+                    
+                    // Update trends
+                    if (previous) {
+                        const consumptionChange = ((latest.total_consumption - previous.total_consumption) / previous.total_consumption) * 100;
+                        const rainfallChange = ((latest.avg_rainfall - previous.avg_rainfall) / previous.avg_rainfall) * 100;
+                        
+                        document.getElementById('consumption-trend').innerHTML = 
+                            `<span class="${consumptionChange >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                ${consumptionChange >= 0 ? '↑' : '↓'} ${Math.abs(consumptionChange).toFixed(1)}%
+                            </span>`;
+                        
+                        document.getElementById('rainfall-trend').innerHTML = 
+                            `<span class="${rainfallChange >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                ${rainfallChange >= 0 ? '↑' : '↓'} ${Math.abs(rainfallChange).toFixed(1)}%
+                            </span>`;
+                    }
+                    
+                    // Update anomalies count
+                    const anomalies = data.filter(item => item.is_anomaly);
+                    document.getElementById('anomalies-count').textContent = anomalies.length;
+                    
+                    // Update anomalies percentage
+                    const anomalyPercentage = (anomalies.length / data.length) * 100;
+                    document.getElementById('anomalies-percentage').textContent = anomalyPercentage.toFixed(1);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching summary data:', error);
+            });
+    }
+
+    // Quick check consumption functionality
+    document.getElementById('quick-check-button').addEventListener('click', function() {
+        const consumption = document.getElementById('quick-check-consumption').value;
+        const rainfall = document.getElementById('quick-check-rainfall').value;
+        
+        if (!consumption) {
+            alert('Please enter a consumption value.');
+            return;
+        }
+        
+        // Show loading state
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking...';
+        
+        // Call API
+        fetch('/api/check-consumption', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                consumption: consumption,
+                rainfall: rainfall || null
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resultElement = document.getElementById('quick-check-result');
+            const messageElement = document.getElementById('result-message');
+            const detailsElement = document.getElementById('result-details');
+            
+            resultElement.classList.remove('hidden', 'bg-green-100', 'bg-red-100');
+            
+            if (data.is_anomaly) {
+                resultElement.classList.add('bg-red-100');
+                messageElement.textContent = 'Anomalous Consumption Detected';
+                messageElement.className = 'text-lg font-medium text-red-700';
+                detailsElement.textContent = `The consumption value of ${consumption} m³ is outside the expected range.`;
+            } else {
+                resultElement.classList.add('bg-green-100');
+                messageElement.textContent = 'Normal Consumption';
+                messageElement.className = 'text-lg font-medium text-green-700';
+                detailsElement.textContent = `The consumption value of ${consumption} m³ is within the expected range.`;
+            }
+            
+            resultElement.classList.remove('hidden');
+        })
+        .catch(error => {
+            console.error('Error checking consumption:', error);
+            alert('Error checking consumption. Please try again.');
+        })
+        .finally(() => {
+            // Reset button state
+            const button = document.getElementById('quick-check-button');
+            button.disabled = false;
+            button.innerHTML = 'Check Consumption';
+        });
+    });
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCharts();
+        loadSummaryData();
+        
+        // Make charts responsive
+        window.addEventListener('resize', function() {
+            Plotly.relayout('consumption-rainfall-chart', {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+            Plotly.relayout('consumption-range-chart', {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+            Plotly.relayout('correlation-chart', {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        });
+    });
+</script>
+{% endblock %}
