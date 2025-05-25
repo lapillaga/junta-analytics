@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Water Management AI{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-chart-line text-primary"></i>
+                Water Management Dashboard
+            </h1>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+        <p class="text-muted mb-0">
+            Real-time insights for rural water consumption and rainfall analysis
+        </p>
+    </div>
+</div>
+
+<!-- Loading State -->
+<div id="loading-state" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading dashboard data...</span>
+    </div>
+    <p class="mt-3">Loading dashboard data...</p>
+</div>
+
+<!-- Error State -->
+<div id="error-state" class="alert alert-danger" style="display: none;">
+    <h5 class="alert-heading">
+        <i class="fas fa-exclamation-triangle"></i> Error Loading Dashboard
+    </h5>
+    <p id="error-message"></p>
+    <button class="btn btn-outline-danger btn-sm" onclick="refreshDashboard()">
+        <i class="fas fa-redo"></i> Try Again
+    </button>
+</div>
+
+<!-- Main Dashboard Content -->
+<div id="dashboard-content" style="display: none;">
+    <!-- KPI Cards will be inserted here -->
+    <div id="kpi-cards-container"></div>
+
+    <!-- Main Charts -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i>
+                        Rainfall vs Consumption Timeline
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="timeline-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-scatter-chart"></i>
+                        Correlation Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="correlation-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secondary Charts -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calendar-alt"></i>
+                        Seasonal Patterns
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="seasonal-heatmap" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Neighborhood Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="neighborhood-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Predictions and Risk -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-crystal-ball"></i>
+                        Consumption Predictions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="prediction-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Risk Classification
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="risk-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Anomaly Detection Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-search"></i>
+                        Anomaly Detection
+                    </h5>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#anomalyTestModal">
+                        <i class="fas fa-plus"></i> Test New Reading
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div id="anomaly-chart" class="chart-container"></div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div id="recent-anomalies">
+                                <h6>Recent Anomalies</h6>
+                                <div id="anomaly-list">
+                                    <!-- Anomaly list will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Last Updated Info -->
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center text-muted">
+                <small>
+                    <i class="fas fa-clock"></i>
+                    Last updated: <span id="last-updated">Never</span>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Anomaly Test Modal -->
+<div class="modal fade" id="anomalyTestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-search"></i> Test Anomaly Detection
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="anomaly-test-form">
+                    <div class="mb-3">
+                        <label for="meter-id" class="form-label">Water Meter ID</label>
+                        <input type="number" class="form-control" id="meter-id" required
+                               placeholder="Enter meter ID">
+                    </div>
+                    <div class="mb-3">
+                        <label for="previous-reading" class="form-label">Previous Reading</label>
+                        <input type="number" class="form-control" id="previous-reading" required
+                               placeholder="Enter previous reading">
+                    </div>
+                    <div class="mb-3">
+                        <label for="current-reading" class="form-label">Current Reading</label>
+                        <input type="number" class="form-control" id="current-reading" required
+                               placeholder="Enter current reading">
+                    </div>
+                    <div class="mb-3">
+                        <label for="days-billed" class="form-label">Days Billed</label>
+                        <input type="number" class="form-control" id="days-billed" value="30" required>
+                    </div>
+                </form>
+
+                <!-- Results -->
+                <div id="anomaly-result" style="display: none;">
+                    <hr>
+                    <h6>Detection Result:</h6>
+                    <div id="anomaly-result-content"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="testAnomaly()">
+                    <i class="fas fa-search"></i> Detect Anomaly
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Dashboard initialization
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboard();
+});
+
+// Auto-refresh every 5 minutes
+setInterval(function() {
+    refreshDashboard();
+}, 300000);
+</script>
+{% endblock %}
