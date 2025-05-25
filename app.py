@@ -481,6 +481,44 @@ def train_models():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    try:
+        # Check database connection
+        db_status = "connected" if db_manager and db_manager.engine else "disconnected"
+
+        # Check data availability
+        data_status = {
+            'merged_data': merged_data is not None,
+            'consumption_data': consumption_data is not None
+        }
+
+        # Check model availability
+        model_status = {}
+        for model_type in ['anomaly_detector', 'consumption_predictor']:
+            try:
+                model = model_manager.get_model(model_type)
+                model_status[model_type] = model.is_trained
+            except:
+                model_status[model_type] = False
+
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'database': db_status,
+            'data': data_status,
+            'models': model_status
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
@@ -507,8 +545,8 @@ if __name__ == '__main__':
 
         # Run the Flask app
         app.run(
-            host='127.0.0.1',
-            port=5000,
+            host='0.0.0.0',
+            port=8000,
             debug=Config.DEBUG
         )
 
