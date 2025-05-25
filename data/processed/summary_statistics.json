@@ -1,0 +1,32 @@
+{
+  "total_periods": 29,
+  "date_range": {
+    "start": "2022-12",
+    "end": "2025-04"
+  },
+  "consumption_stats": {
+    "mean": 10.243046288196366,
+    "std": 1.0060824329305453,
+    "min": 8.528901734104046,
+    "max": 12.44186046511628
+  },
+  "rainfall_stats": {
+    "mean": 44.69609817748784,
+    "std": 24.46118865884932,
+    "min": 16.9150018018018,
+    "max": 86.24292042042043
+  },
+  "correlation": {
+    "rainfall_consumption": -0.2195371629450605
+  },
+  "seasonal_patterns": {
+    "avg_consumption": {
+      "Dry Season": 10.369895302505633,
+      "Rainy Season": 10.086924424431114
+    },
+    "avg_rainfall": {
+      "Dry Season": 51.7296222972973,
+      "Rainy Season": 36.039453106953104
+    }
+  }
+}

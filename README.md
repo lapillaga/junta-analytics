@@ -1,118 +1,80 @@
-# Junta Analytics - Water Quality Monitoring System
+# Water Management AI System
 
-A Flask-based web application for water quality monitoring and consumption analytics. This system processes water meter readings and rainfall data to detect anomalies, generate forecasts, and visualize consumption patterns.
+An intelligent water consumption analysis system for rural water boards,
+integrating rainfall data with consumption patterns to detect anomalies and
+predict usage.
 
 ## Features
 
-- Data integration from PostgreSQL database (meter readings) and CSV files (rainfall)
-- Data processing and fusion of consumption and precipitation data
-- Anomaly detection using Isolation Forest algorithm
-- Consumption forecasting
-- Interactive dashboards and visualization
-- API endpoints for data access
-- Consumption validation form
+- **Data Integration**: Temporal fusion of rainfall and water consumption data
+- **Anomaly Detection**: ML-powered detection of suspicious meter readings
+- **Consumption Prediction**: Forecast water usage with climate variables
+- **Interactive Dashboard**: Real-time visualizations and insights
+- **MLflow Integration**: Model versioning and experiment tracking
 
-## Tech Stack
-
-- **Backend**: Flask, SQLAlchemy
-- **Data Processing**: Pandas, NumPy
-- **Machine Learning**: Scikit-learn
-- **Visualization**: Plotly, Matplotlib
-- **Frontend**: Tailwind CSS
-- **Database**: PostgreSQL
-- **Deployment**: Docker, Docker Compose
-
-## Project Structure
-
-```
-junta-analytics/
-├── app.py                  # Main application entry point
-├── config.py               # Configuration settings
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Docker configuration
-├── docker-compose.yml      # Docker Compose services
-├── init.sql                # Database initialization
-├── data/                   # Data directory
-│   ├── raw/                # Raw data files
-│   ├── processed/          # Processed data files
-│   └── external/           # External data files
-├── models/                 # Machine learning models
-├── static/                 # Static assets
-├── templates/              # HTML templates
-├── utils/                  # Utility functions
-├── services/               # Service layer
-└── controllers/            # Controllers/routes
-```
-
-## Setup and Installation
-
-### Using Docker (Recommended)
+## Installation
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/junta-analytics.git
-   cd junta-analytics
-   ```
 
-2. Create a `.env` file:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+git clone https://github.com/lapillaga/junta-analytics.git
+cd junta-analytics
+```
 
-3. Update the `.env` file with your configuration.
+2. Create virtual environment:
 
-4. Start the application with Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
-
-5. Access the application at http://localhost:5000
-
-### Manual Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/junta-analytics.git
-   cd junta-analytics
-   ```
-
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
 3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
 
-4. Create a `.env` file:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-5. Update the `.env` file with your configuration.
+4. Setup environment variables:
 
-6. Start the application:
-   ```bash
-   flask run
-   ```
+```bash
+cp .env.example .env
 
-7. Access the application at http://localhost:5000
+# Edit .env with your configuration
+```
 
-## API Endpoints
+5. Setup database:
 
-- `/api/meter-readings` - Get all meter readings
-- `/api/consumption-rainfall` - Get merged consumption and rainfall data
-- `/api/forecast` - Get consumption forecasts
-- `/api/check-consumption` - Check if a consumption value is anomalous
+```bash
+psql -U your_user -d your_db -f database_setup.sql
+```
 
-## Data Sources
+## Usage
+- Run Jupyter Lab
+```bash
+jupyter lab
+```
 
-- Meter readings: PostgreSQL database
-- Rainfall data: CSV file (dekadal rainfall indicators)
+- Start Flask Application
+```bash
+python src/app.py
+```
 
-## License
+- Start MLflow UI
+```bash
+mlflow server --backend-store-uri ./mlflow_runs --host 0.0.0.0 --port 9090
+```
 
-[MIT License](LICENSE)
+- Project Structure
+
+  - notebooks/: Jupyter notebooks for data analysis and model training
+  - src/: Source code for Flask application and ML models
+  - data/: Data storage (raw, processed, models)
+  - static/: Static files for web interface
+
+- Technologies Used
+  - Data Science: Pandas, NumPy, Scikit-learn
+  - Visualization: Plotly, Matplotlib, Seaborn
+  - Web Framework: Flask
+  - Database: PostgreSQL, SQLAlchemy
+  - ML Tracking: MLflow
+  - Frontend: HTML5, JavaScript, Bootstrap
