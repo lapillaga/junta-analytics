@@ -26,6 +26,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+import mlflow
+mlflow.start_run
 
 # Initialize Flask app
 app = Flask(__name__)

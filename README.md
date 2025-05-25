@@ -62,6 +62,7 @@ python src/app.py
 - Start MLflow UI
 ```bash
 mlflow server --backend-store-uri ./mlflow_runs --host 0.0.0.0 --port 9090
+mlflow server --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 9090
 ```
 
 - Project Structure
