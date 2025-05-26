@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
@@ -9,6 +10,7 @@ import pandas as pd
 
 from .anomaly_detector import AnomalyDetector
 from .consumption_predictor import ConsumptionPredictor
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +38,10 @@ class ModelManager:
             experiment = mlflow.get_experiment_by_name(experiment_name)
             if experiment is None:
                 experiment_id = mlflow.create_experiment(experiment_name)
-                logger.info(
-                    f"Created new MLflow experiment: {experiment_name}")
+                logger.info(f"Created new MLflow experiment: {experiment_name}")
             else:
                 experiment_id = experiment.experiment_id
-                logger.info(
-                    f"Using existing MLflow experiment: {experiment_name}")
+                logger.info(f"Using existing MLflow experiment: {experiment_name}")
 
             self.experiment_id = experiment_id
             mlflow.set_experiment(experiment_name)
@@ -50,16 +50,44 @@ class ModelManager:
             logger.error(f"Error setting up MLflow: {e}")
             self.experiment_id = None
 
-    def train_anomaly_detector(self, training_data: pd.DataFrame,
-                               climate_data: pd.DataFrame = None,
-                               model_params: Dict = None) -> str:
+        # Load existing models
+        self._load_models()
+
+    def _load_models(self):
+        """Load existing trained models from disk"""
+        # Load AnomalyDetector
+        print("Loading anomaly detector model...")
+        try:
+            if os.path.exists(Config.ANOMALY_DETECTOR_MODEL_PATH):
+                anomaly_detector = AnomalyDetector()
+                anomaly_detector.load(Config.ANOMALY_DETECTOR_MODEL_PATH)
+                self.models['anomaly_detector'] = anomaly_detector
+                logger.info("Loaded existing anomaly detector model")
+            else:
+                # Initialize empty model
+                self.models['anomaly_detector'] = AnomalyDetector()
+                logger.info("Initialized empty anomaly detector model")
+        except Exception as e:
+            logger.warning(f"Failed to load anomaly detector: {e}")
+            self.models['anomaly_detector'] = AnomalyDetector()
+
+        # TODO: Add consumption predictor loading when available
+
+    def train_anomaly_detector(
+        self, 
+        training_df: pd.DataFrame,
+        climate_df: Optional[pd.DataFrame] = None,
+        model_params: Optional[Dict] = None,
+        use_synthetic: bool = True
+    ) -> str:
         """
         Train anomaly detection model with MLflow tracking
 
         Args:
-            training_data: Training data (should already have features prepared)
-            climate_data: Optional climate data
+            training_df: Training data DataFrame
+            climate_df: Optional climate data DataFrame
             model_params: Model parameters
+            use_synthetic: Whether to use synthetic anomalies for training
 
         Returns:
             MLflow run ID
@@ -69,106 +97,49 @@ class ModelManager:
                 # Initialize model
                 params = model_params or {}
                 anomaly_detector = AnomalyDetector(
-                    contamination=params.get('contamination', 0.1),
+                    contamination=params.get('contamination', 0.03),
                     random_state=params.get('random_state', 42)
                 )
 
                 # Log parameters
                 mlflow.log_param("model_type", "anomaly_detector")
                 mlflow.log_param("algorithm", "isolation_forest")
-                mlflow.log_param("contamination",
-                                 anomaly_detector.contamination)
+                mlflow.log_param("contamination", anomaly_detector.contamination)
                 mlflow.log_param("random_state", anomaly_detector.random_state)
-                mlflow.log_param("training_samples", len(training_data))
-                mlflow.log_param("has_climate_data", climate_data is not None)
+                mlflow.log_param("training_samples", len(training_df))
+                mlflow.log_param("has_climate_data", climate_df is not None)
+                mlflow.log_param("use_synthetic", use_synthetic)
 
-                # VERIFICAR QUE LOS DATOS TENGAN LAS CARACTERÍSTICAS NECESARIAS
-                print(f"📊 Datos recibidos en ModelManager:")
-                print(f"   - Shape: {training_data.shape}")
-                print(f"   - Columnas: {list(training_data.columns)}")
+                logger.info(f"Training anomaly detector with {len(training_df)} samples")
+                logger.info(f"Training data columns: {list(training_df.columns)}")
 
-                # USAR SOLO LAS CARACTERÍSTICAS DISPONIBLES
-                # Si training_data ya tiene características preparadas, usarlas directamente
-                if 'consumption_zscore' in training_data.columns:
-                    # Los datos ya están preparados con características
-                    available_features = [col for col in training_data.columns
-                                          if col not in ['water_meter_id',
-                                                         'measure_id']]
-                    feature_data = training_data[available_features]
-
-                    # Simular el entrenamiento (ya que el modelo real ya está entrenado)
-                    results = {
-                        'detected_anomalies_train': int(
-                            len(training_data) * anomaly_detector.contamination),
-                        'anomaly_rate_train': anomaly_detector.contamination,
-                        'features_used': len(available_features),
-                        'feature_names': available_features
-                    }
-                else:
-                    # Si no están preparadas, usar el detector para prepararlas
-                    print(
-                        "Preparando características con AnomalyDetector...")
-                    results = anomaly_detector.train(
-                        training_data,
-                        climate_data,
-                        use_synthetic_anomalies=True
-                    )
+                # Train model
+                metrics = anomaly_detector.train(
+                    training_df=training_df,
+                    climate_df=climate_df,
+                    use_synthetic=use_synthetic
+                )
 
                 # Log metrics
-                mlflow.log_metric("detected_anomalies_train",
-                                  results['detected_anomalies_train'])
-                mlflow.log_metric("anomaly_rate_train",
-                                  results['anomaly_rate_train'])
-                mlflow.log_metric("features_used", results['features_used'])
+                for metric_name, metric_value in metrics.items():
+                    mlflow.log_metric(metric_name, metric_value)
 
-                if 'precision' in results:
-                    mlflow.log_metric("precision", results['precision'])
-                    mlflow.log_metric("recall", results['recall'])
-                    mlflow.log_metric("f1_score", results['f1_score'])
-                    mlflow.log_metric("auc_score", results['auc_score'])
+                # Log feature names if available
+                if anomaly_detector.feature_columns_:
+                    mlflow.log_param("feature_names", ",".join(anomaly_detector.feature_columns_))
+                    mlflow.log_param("num_features", len(anomaly_detector.feature_columns_))
 
-                # Log feature names
-                feature_names = results.get('feature_names', [])
-                if feature_names:
-                    mlflow.log_param("feature_names", ",".join(feature_names))
+                # Save model to configured path
+                anomaly_detector.save(Config.ANOMALY_DETECTOR_MODEL_PATH)
+                logger.info(f"Model saved to {Config.ANOMALY_DETECTOR_MODEL_PATH}")
 
-                # GUARDAR Y REGISTRAR MODELO DE FORMA MÁS ROBUSTA
-                try:
-                    # Save model file
-                    model_path = f"anomaly_detector_{datetime.now().strftime('%Y%m%d_%H%M%S')}.joblib"
-                    anomaly_detector.save_model(model_path)
-                    mlflow.log_artifact(model_path, "models")
-
-                    # Log model with MLflow si tiene características válidas
-                    if anomaly_detector.is_trained and hasattr(
-                        anomaly_detector, 'model'):
-                        # Crear signature basado en las características reales del modelo
-                        if feature_names and len(feature_names) > 0:
-                            # Usar solo las primeras filas para crear signature
-                            sample_data = training_data[feature_names].head(
-                                5).fillna(0)
-
-                            mlflow.sklearn.log_model(
-                                anomaly_detector.model,
-                                "isolation_forest_model",
-                                signature=mlflow.models.infer_signature(
-                                    sample_data)
-                            )
-                        else:
-                            # Sin signature si no hay características válidas
-                            mlflow.sklearn.log_model(
-                                anomaly_detector.model,
-                                "isolation_forest_model"
-                            )
-
-                except Exception as model_save_error:
-                    print(f"Error guardando modelo: {model_save_error}")
+                # Log model artifact in MLflow
+                mlflow.log_artifact(Config.ANOMALY_DETECTOR_MODEL_PATH, "models")
 
                 # Store model in memory
                 self.models['anomaly_detector'] = anomaly_detector
 
-                logger.info(
-                    f"Anomaly detector training completed. Run ID: {run.info.run_id}")
+                logger.info(f"Anomaly detector training completed. Run ID: {run.info.run_id}")
                 return run.info.run_id
 
             except Exception as e:
@@ -177,22 +148,24 @@ class ModelManager:
                 mlflow.log_param("error_message", str(e))
                 raise
 
-    def train_consumption_predictor(self, training_data: pd.DataFrame,
-                                    climate_data: pd.DataFrame = None,
-                                    model_params: Dict = None) -> str:
+    def train_consumption_predictor(
+        self,
+        training_df: pd.DataFrame,
+        climate_df: Optional[pd.DataFrame] = None,
+        model_params: Optional[Dict] = None
+    ) -> str:
         """
         Train consumption prediction model with MLflow tracking
-
+        
         Args:
-            training_data: Training data
-            climate_data: Optional climate data
+            training_df: Training data DataFrame
+            climate_df: Optional climate data DataFrame
             model_params: Model parameters
-
+            
         Returns:
             MLflow run ID
         """
-        with mlflow.start_run(
-            run_name="consumption_predictor_training") as run:
+        with mlflow.start_run(run_name="consumption_predictor_training") as run:
             try:
                 # Initialize model
                 params = model_params or {}
@@ -204,60 +177,31 @@ class ModelManager:
                 # Log parameters
                 mlflow.log_param("model_type", "consumption_predictor")
                 mlflow.log_param("algorithm", consumption_predictor.model_type)
-                mlflow.log_param("random_state",
-                                 consumption_predictor.random_state)
-                mlflow.log_param("training_samples", len(training_data))
-                mlflow.log_param("has_climate_data", climate_data is not None)
+                mlflow.log_param("random_state", consumption_predictor.random_state)
+                mlflow.log_param("training_samples", len(training_df))
+                mlflow.log_param("has_climate_data", climate_df is not None)
 
                 # Train model
                 results = consumption_predictor.train(
-                    training_data,
-                    climate_data,
+                    training_df,
+                    climate_df,
                     test_size=params.get('test_size', 0.2)
                 )
 
                 # Log metrics
-                mlflow.log_metric("train_mae", results['train_mae'])
-                mlflow.log_metric("train_rmse", results['train_rmse'])
-                mlflow.log_metric("train_r2", results['train_r2'])
-                mlflow.log_metric("test_mae", results['test_mae'])
-                mlflow.log_metric("test_rmse", results['test_rmse'])
-                mlflow.log_metric("test_r2", results['test_r2'])
-                mlflow.log_metric("cv_mae", results['cv_mae'])
-                mlflow.log_metric("cv_mae_std", results['cv_mae_std'])
-                mlflow.log_metric("features_used", results['features_used'])
+                for metric_name, metric_value in results.items():
+                    if isinstance(metric_value, (int, float)):
+                        mlflow.log_metric(metric_name, metric_value)
 
-                # Log feature importance if available
-                if results['feature_importance']:
-                    # Log top 10 features
-                    top_features = dict(
-                        list(results['feature_importance'].items())[:10])
-                    for feature, importance in top_features.items():
-                        mlflow.log_metric(f"importance_{feature}", importance)
-
-                # Log feature names
-                mlflow.log_param("feature_names",
-                                 ",".join(results['feature_names']))
-
-                # Save and log model
-                model_path = f"consumption_predictor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.joblib"
-                consumption_predictor.save_model(model_path)
-                mlflow.log_artifact(model_path, "models")
-
-                # Log model with MLflow
-                mlflow.sklearn.log_model(
-                    consumption_predictor.model,
-                    "consumption_model",
-                    signature=mlflow.models.infer_signature(
-                        training_data[results['feature_names']].head()
-                    )
-                )
+                # Save model
+                predictor_path = os.path.join(Config.MODELS_PATH, 'consumption_predictor_v1.joblib')
+                consumption_predictor.save(predictor_path)
+                mlflow.log_artifact(predictor_path, "models")
 
                 # Store model in memory
                 self.models['consumption_predictor'] = consumption_predictor
 
-                logger.info(
-                    f"Consumption predictor training completed. Run ID: {run.info.run_id}")
+                logger.info(f"Consumption predictor training completed. Run ID: {run.info.run_id}")
                 return run.info.run_id
 
             except Exception as e:
@@ -265,79 +209,6 @@ class ModelManager:
                 mlflow.log_param("training_status", "failed")
                 mlflow.log_param("error_message", str(e))
                 raise
-
-    def register_model(self, model_name: str, run_id: str,
-                       stage: str = "Staging") -> str:
-        """
-        Register model in MLflow Model Registry
-
-        Args:
-            model_name: Name for the registered model
-            run_id: MLflow run ID
-            stage: Model stage (Staging, Production, etc.)
-
-        Returns:
-            Model version
-        """
-        try:
-            # Register model
-            model_uri = f"runs:/{run_id}/model"
-            model_version = mlflow.register_model(model_uri, model_name)
-
-            # Transition to specified stage
-            mlflow.transitions.transition_model_version_stage(
-                name=model_name,
-                version=model_version.version,
-                stage=stage
-            )
-
-            logger.info(
-                f"Model {model_name} version {model_version.version} registered in {stage}")
-            return model_version.version
-
-        except Exception as e:
-            logger.error(f"Error registering model: {e}")
-            raise
-
-    def load_model(self, model_name: str, model_type: str,
-                   stage: str = "Production") -> Any:
-        """
-        Load model from MLflow Model Registry
-
-        Args:
-            model_name: Registered model name
-            model_type: Type of model ('anomaly_detector', 'consumption_predictor')
-            stage: Model stage to load from
-
-        Returns:
-            Loaded model instance
-        """
-        try:
-            # Load model from registry
-            model_uri = f"models:/{model_name}/{stage}"
-            loaded_model = mlflow.sklearn.load_model(model_uri)
-
-            # Create appropriate model instance
-            if model_type == 'anomaly_detector':
-                model_instance = AnomalyDetector()
-                model_instance.model = loaded_model
-                model_instance.is_trained = True
-            elif model_type == 'consumption_predictor':
-                model_instance = ConsumptionPredictor()
-                model_instance.model = loaded_model
-                model_instance.is_trained = True
-            else:
-                raise ValueError(f"Unknown model type: {model_type}")
-
-            # Store in memory
-            self.models[model_type] = model_instance
-
-            logger.info(f"Model {model_name} loaded from {stage}")
-            return model_instance
-
-        except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            raise
 
     def get_model(self, model_type: str) -> Any:
         """
@@ -348,14 +219,21 @@ class ModelManager:
 
         Returns:
             Model instance
-        """
-        print(f'Getting model of type: {model_type}')
-        print(f'Models in memory: {self.models.keys()}')
-        if model_type not in self.models:
-            raise ValueError(
-                f"Model {model_type} not found. Train or load model first.")
 
-        return self.models[model_type]
+        Raises:
+            ValueError: If model type not found
+        """
+        logger.debug(f'Getting model of type: {model_type}')
+        logger.debug(f'Models in memory: {list(self.models.keys())}')
+        
+        if model_type not in self.models:
+            raise ValueError(f"Model {model_type} not found. Train or load model first.")
+
+        model = self.models[model_type]
+        if not hasattr(model, 'is_trained') or not model.is_trained:
+            raise ValueError(f"Model {model_type} is not trained yet.")
+
+        return model
 
     def list_experiments(self) -> List[Dict]:
         """List all MLflow experiments"""
@@ -373,8 +251,7 @@ class ModelManager:
             logger.error(f"Error listing experiments: {e}")
             return []
 
-    def list_runs(self, experiment_id: str = None, max_results: int = 10) -> \
-        List[Dict]:
+    def list_runs(self, experiment_id: str = None, max_results: int = 10) -> List[Dict]:
         """
         List MLflow runs
 
@@ -387,10 +264,13 @@ class ModelManager:
         """
         try:
             exp_id = experiment_id or self.experiment_id
+            if exp_id is None:
+                return []
+                
             runs = mlflow.search_runs(
                 experiment_ids=[exp_id],
                 max_results=max_results,
-                order_by=["metrics.test_r2 DESC", "start_time DESC"]
+                order_by=["start_time DESC"]
             )
 
             return runs.to_dict('records') if not runs.empty else []
@@ -399,98 +279,29 @@ class ModelManager:
             logger.error(f"Error listing runs: {e}")
             return []
 
-    def compare_models(self, run_ids: List[str]) -> pd.DataFrame:
-        """
-        Compare multiple model runs
-
-        Args:
-            run_ids: List of MLflow run IDs to compare
-
-        Returns:
-            Comparison dataframe
-        """
-        try:
-            comparison_data = []
-
-            for run_id in run_ids:
-                run = mlflow.get_run(run_id)
-
-                data = {
-                    'run_id': run_id,
-                    'run_name': run.data.tags.get('mlflow.runName', 'Unknown'),
-                    'start_time': run.info.start_time,
-                    'status': run.info.status
-                }
-
-                # Add parameters
-                data.update(
-                    {f"param_{k}": v for k, v in run.data.params.items()})
-
-                # Add metrics
-                data.update(
-                    {f"metric_{k}": v for k, v in run.data.metrics.items()})
-
-                comparison_data.append(data)
-
-            return pd.DataFrame(comparison_data)
-
-        except Exception as e:
-            logger.error(f"Error comparing models: {e}")
-            return pd.DataFrame()
-
-    def get_best_model(self, model_type: str, metric: str = "test_r2") -> \
-        Optional[str]:
-        """
-        Get best model run ID based on a metric
-
-        Args:
-            model_type: Type of model to search for
-            metric: Metric to optimize for
-
-        Returns:
-            Best run ID or None
-        """
-        try:
-            runs = mlflow.search_runs(
-                experiment_ids=[self.experiment_id],
-                filter_string=f"params.model_type = '{model_type}'",
-                order_by=[f"metrics.{metric} DESC"],
-                max_results=1
-            )
-
-            if not runs.empty:
-                return runs.iloc[0]['run_id']
-
-            return None
-
-        except Exception as e:
-            logger.error(f"Error finding best model: {e}")
-            return None
-
-    def cleanup_old_runs(self, keep_last_n: int = 10):
-        """
-        Clean up old MLflow runs (keep only the most recent)
-
-        Args:
-            keep_last_n: Number of recent runs to keep
-        """
-        try:
-            runs = mlflow.search_runs(
-                experiment_ids=[self.experiment_id],
-                order_by=["start_time DESC"]
-            )
-
-            if len(runs) > keep_last_n:
-                old_runs = runs.iloc[keep_last_n:]
-
-                for _, run in old_runs.iterrows():
-                    mlflow.delete_run(run['run_id'])
-                    logger.info(f"Deleted old run: {run['run_id']}")
-
-                logger.info(f"Cleaned up {len(old_runs)} old runs")
-
-        except Exception as e:
-            logger.error(f"Error cleaning up runs: {e}")
+    def get_model_info(self) -> Dict:
+        """Get information about loaded models"""
+        model_info = {}
+        
+        for model_type, model in self.models.items():
+            info = {
+                'is_trained': getattr(model, 'is_trained', False),
+                'model_class': model.__class__.__name__
+            }
+            
+            if hasattr(model, 'feature_columns_'):
+                info['feature_columns'] = model.feature_columns_
+                info['num_features'] = len(model.feature_columns_)
+            
+            if hasattr(model, 'contamination'):
+                info['contamination'] = model.contamination
+                
+            if hasattr(model, 'score_threshold_'):
+                info['score_threshold'] = model.score_threshold_
+                
+            model_info[model_type] = info
+            
+        return model_info
 
     def export_model_info(self, output_path: str):
         """
@@ -503,20 +314,10 @@ class ModelManager:
             model_info = {
                 'experiment_name': self.experiment_name,
                 'experiment_id': self.experiment_id,
-                'models': {}
+                'models': self.get_model_info(),
+                'recent_runs': self.list_runs(max_results=5),
+                'exported_at': datetime.now().isoformat()
             }
-
-            for model_type, model in self.models.items():
-                if hasattr(model, 'feature_columns'):
-                    model_info['models'][model_type] = {
-                        'is_trained': model.is_trained,
-                        'feature_columns': model.feature_columns,
-                        'model_class': model.__class__.__name__
-                    }
-
-            # Get recent runs
-            recent_runs = self.list_runs(max_results=5)
-            model_info['recent_runs'] = recent_runs
 
             with open(output_path, 'w') as f:
                 json.dump(model_info, f, indent=2, default=str)

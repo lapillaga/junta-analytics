@@ -29,8 +29,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-import mlflow
-mlflow.start_run
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -206,6 +204,7 @@ def detect_anomaly():
 
         # Check if we have a trained model
         try:
+            print("Checking for anomaly detector model...")
             anomaly_detector = model_manager.get_model('anomaly_detector')
         except:
             print("Anomaly detector model not found")
@@ -438,9 +437,10 @@ def train_models():
         if 'anomaly_detector' in model_types:
             try:
                 run_id = model_manager.train_anomaly_detector(
-                    consumption_data,
-                    climate_data=merged_data,
-                    model_params=data.get('anomaly_params', {})
+                    training_df=consumption_data,
+                    climate_df=merged_data,
+                    model_params=data.get('anomaly_params', {}),
+                    use_synthetic=data.get('use_synthetic', True)
                 )
                 training_results['anomaly_detector'] = {
                     'status': 'success',

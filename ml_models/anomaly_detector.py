@@ -169,6 +169,114 @@ class AnomalyDetector:
         self.rain_monthly_ = art["rain_monthly"]
         self.score_threshold_ = art["threshold"]
         self.is_trained = True
+        logger.info(f"Model loaded from {path}")
+
+    def detect_single_reading(
+        self,
+        water_meter_id: int,
+        current_reading: int,
+        previous_reading: int,
+        days_billed: int,
+        historical_data: pd.DataFrame,
+        period_start: Optional[str] = None,
+    ) -> Dict:
+        """
+        Detecta anomalías en una sola lectura usando el modelo entrenado.
+        
+        Args:
+            water_meter_id: ID del medidor de agua
+            current_reading: Lectura actual del medidor
+            previous_reading: Lectura anterior del medidor
+            days_billed: Días del período de facturación
+            historical_data: DataFrame con datos históricos para inferir neighborhood_id
+            period_start: Fecha de inicio del período (opcional)
+        
+        Returns:
+            Dict con is_anomaly, score, confidence, reason
+        """
+        if not self.is_trained:
+            raise RuntimeError("Model not trained")
+        
+        # Calcular consumo total
+        total_consumed = current_reading - previous_reading
+        
+        if total_consumed < 0:
+            return {
+                "is_anomaly": True,
+                "score": 1.0,
+                "confidence": 1.0,
+                "reason": "Lectura actual menor que anterior",
+                "total_consumed": total_consumed,
+                "consumption_per_day": 0
+            }
+        
+        # Inferir neighborhood_id desde historical_data si está disponible
+        neighborhood_id = None
+        if 'neighborhood_id' in historical_data.columns:
+            meter_neighborhoods = historical_data[
+                historical_data['water_meter_id'] == water_meter_id
+            ]['neighborhood_id'].unique()
+            if len(meter_neighborhoods) > 0:
+                neighborhood_id = meter_neighborhoods[0]
+        
+        # Crear DataFrame para la predicción
+        if period_start is None:
+            period_start = datetime.now().strftime('%Y-%m-%d')
+        
+        single_reading = pd.DataFrame({
+            'water_meter_id': [water_meter_id],
+            'total_consumed': [total_consumed],
+            'days_billed': [days_billed],
+            'period_start': [period_start],
+            'neighborhood_id': [neighborhood_id] if neighborhood_id is not None else [0]
+        })
+        
+        try:
+            # Realizar predicción
+            result = self.predict(single_reading)
+            
+            is_anomaly = bool(result['anomaly'][0])
+            score = float(result['score'][0])
+            confidence = float(result['confidence'][0])
+
+            print("Anomaly detected:", is_anomaly)
+            print("Score:", score)
+            print("Confidence:", confidence)
+            
+            consumption_per_day = total_consumed / max(days_billed, 1)
+            
+            # Determinar razón de la anomalía
+            reason = "Normal"
+            if is_anomaly:
+                if total_consumed == 0:
+                    reason = "Consumo cero detectado"
+                elif consumption_per_day > 50:  # Umbral alto
+                    reason = "Consumo excesivamente alto"
+                elif consumption_per_day < 0.1:  # Umbral bajo
+                    reason = "Consumo excesivamente bajo"
+                else:
+                    reason = "Patrón de consumo anómalo detectado"
+            
+            return {
+                "is_anomaly": is_anomaly,
+                "score": score,
+                "confidence": confidence,
+                "reason": reason,
+                "total_consumed": total_consumed,
+                "consumption_per_day": consumption_per_day,
+                "threshold": self.score_threshold_
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in single reading detection: {e}")
+            return {
+                "is_anomaly": True,
+                "score": 1.0,
+                "confidence": 0.5,
+                "reason": f"Error en predicción: {str(e)}",
+                "total_consumed": total_consumed,
+                "consumption_per_day": total_consumed / max(days_billed, 1)
+            }
 
     # ---------- internals ----------
     def _inject_synthetic(self, df: pd.DataFrame, ratio: float = 0.03):
