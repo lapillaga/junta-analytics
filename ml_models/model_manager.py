@@ -8,8 +8,7 @@ import mlflow
 import mlflow.sklearn
 import pandas as pd
 
-from .anomaly_detector import AnomalyDetector
-from .consumption_predictor import ConsumptionPredictor
+from .anomaly_detector_v3 import AnomalyDetectorV3 as AnomalyDetector
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -71,7 +70,6 @@ class ModelManager:
             logger.warning(f"Failed to load anomaly detector: {e}")
             self.models['anomaly_detector'] = AnomalyDetector()
 
-        # TODO: Add consumption predictor loading when available
 
     def train_anomaly_detector(
         self, 
@@ -113,12 +111,8 @@ class ModelManager:
                 logger.info(f"Training anomaly detector with {len(training_df)} samples")
                 logger.info(f"Training data columns: {list(training_df.columns)}")
 
-                # Train model
-                metrics = anomaly_detector.train(
-                    training_df=training_df,
-                    climate_df=climate_df,
-                    use_synthetic=use_synthetic
-                )
+                # Train model (V3 doesn't use climate_df or use_synthetic)
+                metrics = anomaly_detector.train(training_df=training_df)
 
                 # Log metrics
                 for metric_name, metric_value in metrics.items():
@@ -148,67 +142,6 @@ class ModelManager:
                 mlflow.log_param("error_message", str(e))
                 raise
 
-    def train_consumption_predictor(
-        self,
-        training_df: pd.DataFrame,
-        climate_df: Optional[pd.DataFrame] = None,
-        model_params: Optional[Dict] = None
-    ) -> str:
-        """
-        Train consumption prediction model with MLflow tracking
-        
-        Args:
-            training_df: Training data DataFrame
-            climate_df: Optional climate data DataFrame
-            model_params: Model parameters
-            
-        Returns:
-            MLflow run ID
-        """
-        with mlflow.start_run(run_name="consumption_predictor_training") as run:
-            try:
-                # Initialize model
-                params = model_params or {}
-                consumption_predictor = ConsumptionPredictor(
-                    model_type=params.get('model_type', 'random_forest'),
-                    random_state=params.get('random_state', 42)
-                )
-
-                # Log parameters
-                mlflow.log_param("model_type", "consumption_predictor")
-                mlflow.log_param("algorithm", consumption_predictor.model_type)
-                mlflow.log_param("random_state", consumption_predictor.random_state)
-                mlflow.log_param("training_samples", len(training_df))
-                mlflow.log_param("has_climate_data", climate_df is not None)
-
-                # Train model
-                results = consumption_predictor.train(
-                    training_df,
-                    climate_df,
-                    test_size=params.get('test_size', 0.2)
-                )
-
-                # Log metrics
-                for metric_name, metric_value in results.items():
-                    if isinstance(metric_value, (int, float)):
-                        mlflow.log_metric(metric_name, metric_value)
-
-                # Save model
-                predictor_path = os.path.join(Config.MODELS_PATH, 'consumption_predictor_v1.joblib')
-                consumption_predictor.save(predictor_path)
-                mlflow.log_artifact(predictor_path, "models")
-
-                # Store model in memory
-                self.models['consumption_predictor'] = consumption_predictor
-
-                logger.info(f"Consumption predictor training completed. Run ID: {run.info.run_id}")
-                return run.info.run_id
-
-            except Exception as e:
-                logger.error(f"Error training consumption predictor: {e}")
-                mlflow.log_param("training_status", "failed")
-                mlflow.log_param("error_message", str(e))
-                raise
 
     def get_model(self, model_type: str) -> Any:
         """

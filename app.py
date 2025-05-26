@@ -245,48 +245,6 @@ def detect_anomaly():
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 
-@app.route('/api/predict-consumption', methods=['POST'])
-def predict_consumption():
-    """API endpoint for consumption prediction"""
-    try:
-        data = request.get_json()
-
-        if 'water_meter_id' not in data:
-            return jsonify({'error': 'water_meter_id is required'}), 400
-
-        water_meter_id = int(data['water_meter_id'])
-
-        # Check if we have a trained model
-        try:
-            consumption_predictor = model_manager.get_model(
-                'consumption_predictor')
-        except:
-            return jsonify({
-                'error': 'No trained consumption prediction model available'
-            }), 404
-
-        if consumption_data is None:
-            return jsonify({
-                'error': 'No historical data available for prediction'
-            }), 404
-
-        # Get climate forecast if provided
-        climate_forecast = data.get('climate_forecast', {})
-
-        # Make prediction
-        result = consumption_predictor.predict_next_period(
-            meter_id=water_meter_id,
-            historical_data=consumption_data,
-            climate_forecast=climate_forecast
-        )
-
-        return jsonify(result)
-
-    except ValueError as e:
-        return jsonify({'error': f'Invalid input: {str(e)}'}), 400
-    except Exception as e:
-        logger.error(f"Error in consumption prediction: {e}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 
 @app.route('/api/water-meters')
@@ -396,7 +354,7 @@ def get_model_info():
         }
 
         # Check which models are available
-        for model_type in ['anomaly_detector', 'consumption_predictor']:
+        for model_type in ['anomaly_detector']:
             try:
                 model = model_manager.get_model(model_type)
                 model_info['models'][model_type] = {
@@ -428,8 +386,7 @@ def train_models():
             }), 404
 
         data = request.get_json() or {}
-        model_types = data.get('model_types',
-                               ['anomaly_detector', 'consumption_predictor'])
+        model_types = data.get('model_types', ['anomaly_detector'])
 
         training_results = {}
 
@@ -452,23 +409,6 @@ def train_models():
                     'error': str(e)
                 }
 
-        # Train consumption predictor
-        if 'consumption_predictor' in model_types:
-            try:
-                run_id = model_manager.train_consumption_predictor(
-                    consumption_data,
-                    climate_data=merged_data,
-                    model_params=data.get('predictor_params', {})
-                )
-                training_results['consumption_predictor'] = {
-                    'status': 'success',
-                    'run_id': run_id
-                }
-            except Exception as e:
-                training_results['consumption_predictor'] = {
-                    'status': 'failed',
-                    'error': str(e)
-                }
 
         return jsonify({
             'message': 'Model training completed',
@@ -495,7 +435,7 @@ def health_check():
 
         # Check model availability
         model_status = {}
-        for model_type in ['anomaly_detector', 'consumption_predictor']:
+        for model_type in ['anomaly_detector']:
             try:
                 model = model_manager.get_model(model_type)
                 model_status[model_type] = model.is_trained

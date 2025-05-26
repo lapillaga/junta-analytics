@@ -280,13 +280,31 @@ class AnomalyDetector:
 
     # ---------- internals ----------
     def _inject_synthetic(self, df: pd.DataFrame, ratio: float = 0.03):
+        """Genera anomalías sintéticas más realistas basadas en patrones reales"""
         df_syn = df.copy().reset_index(drop=True)
         n = int(len(df_syn) * ratio)
         rng = np.random.default_rng(self.random_state)
         idx = rng.choice(len(df_syn), n, replace=False)
+        
         for i in idx:
-            mult = rng.uniform(4, 8) if rng.random() < 0.5 else rng.uniform(0.1, 0.3)
-            df_syn.at[i, "total_consumed"] *= mult
+            anomaly_type = rng.choice(['high', 'low', 'zero', 'spike'], p=[0.4, 0.3, 0.2, 0.1])
+            
+            if anomaly_type == 'high':
+                # Consumo anormalmente alto (fuga, mal funcionamiento)
+                mult = rng.uniform(3, 6)
+                df_syn.at[i, "total_consumed"] *= mult
+            elif anomaly_type == 'low':
+                # Consumo anormalmente bajo (medidor atascado)
+                mult = rng.uniform(0.05, 0.2)
+                df_syn.at[i, "total_consumed"] *= mult
+            elif anomaly_type == 'zero':
+                # Sin consumo (medidor roto, casa vacía)
+                df_syn.at[i, "total_consumed"] = 0
+            elif anomaly_type == 'spike':
+                # Pico repentino seguido de normalidad
+                mult = rng.uniform(8, 15)
+                df_syn.at[i, "total_consumed"] *= mult
+        
         labels = np.zeros(len(df_syn), dtype=int)
         labels[idx] = 1
         return self._build_features(df_syn), labels
@@ -333,36 +351,64 @@ class AnomalyDetector:
         df["log_consumption"] = np.log1p(df["total_consumed"])
         df["log_consumption_per_day"] = np.log1p(df["consumption_per_day"])
 
+        # Merge meter statistics
         df = df.merge(self.meter_stats_.reset_index(), on="water_meter_id", how="left")
         for c in ["meter_mean", "meter_std", "meter_median", "meter_iqr", "meter_q1", "meter_q3"]:
             df[c] = df[c].fillna(self.meter_stats_[c].median())
 
+        # Características específicas del medidor
         df["z_meter"] = (df["consumption_per_day"] - df["meter_mean"]) / (df["meter_std"] + 1e-3)
         df["meter_percentile"] = np.clip(
             (df["consumption_per_day"] - df["meter_q1"]) / (df["meter_iqr"] + 1e-3),
             0,
             1,
         )
+        
+        # Nuevas características para mejor detección
+        # Desviación absoluta de la mediana (MAD) - más robusta que z-score
+        df["mad_meter"] = np.abs(df["consumption_per_day"] - df["meter_median"]) / (df["meter_iqr"] + 1e-3)
+        
+        # Ratio respecto al consumo típico del medidor
+        df["consumption_ratio"] = df["consumption_per_day"] / (df["meter_median"] + 1e-3)
+        
+        # Detectar consumos extremos
+        df["is_zero_consumption"] = (df["total_consumed"] == 0).astype(int)
+        df["is_very_high"] = (df["consumption_per_day"] > (df["meter_q3"] + 3 * df["meter_iqr"])).astype(int)
+        df["is_very_low"] = (df["consumption_per_day"] < (df["meter_q1"] - 3 * df["meter_iqr"])).astype(int)
 
+        # Características de vecindario
         if "neighborhood_id" in df.columns and not self.neigh_stats_.empty:
             df = df.merge(self.neigh_stats_.reset_index(), on="neighborhood_id", how="left")
             df["neigh_z"] = (df["consumption_per_day"] - df["neigh_median"]) / (
                 df["neigh_std"] + 1e-3
             )
+            # Ratio respecto al vecindario
+            df["neigh_ratio"] = df["consumption_per_day"] / (df["neigh_median"] + 1e-3)
         else:
             df["neigh_z"] = 0
+            df["neigh_ratio"] = 1
 
+        # Características temporales
         df["month"] = pd.to_datetime(df["period_start"], errors="coerce").dt.month.fillna(0)
         df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
         df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+        
+        # Características de días facturados
+        df["days_billed_norm"] = df["days_billed"] / 30.0  # Normalizado a mes estándar
+        df["consumption_per_standard_month"] = df["total_consumed"] * (30.0 / df["days_billed"].clip(lower=1))
 
+        # Características de lluvia
         if self.rain_monthly_ is not None:
             df["period_month"] = (
                 pd.to_datetime(df["period_start"], errors="coerce").dt.to_period("M").astype(str)
             )
             df = df.merge(self.rain_monthly_, on="period_month", how="left")
+            df["period_rainfall"] = df["period_rainfall"].fillna(0)
+            # Interacción lluvia-consumo
+            df["rain_consumption_interaction"] = df["period_rainfall"] * df["consumption_per_day"]
         else:
             df["period_rainfall"] = 0
+            df["rain_consumption_interaction"] = 0
 
         feat_cols = [
             "total_consumed",
@@ -371,11 +417,21 @@ class AnomalyDetector:
             "log_consumption_per_day",
             "z_meter",
             "meter_percentile",
+            "mad_meter",
+            "consumption_ratio",
+            "is_zero_consumption",
+            "is_very_high",
+            "is_very_low",
             "neigh_z",
+            "neigh_ratio",
             "month_sin",
             "month_cos",
             "days_billed",
+            "days_billed_norm",
+            "consumption_per_standard_month",
             "meter_median",
+            "meter_iqr",
             "period_rainfall",
+            "rain_consumption_interaction",
         ]
         return df[feat_cols].fillna(0)

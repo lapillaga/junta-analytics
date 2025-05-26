@@ -1,5 +1,4 @@
-from .anomaly_detector import AnomalyDetector
-from .consumption_predictor import ConsumptionPredictor
+from .anomaly_detector_v3 import AnomalyDetectorV3 as AnomalyDetector
 from .model_manager import ModelManager
 
-__all__ = ['AnomalyDetector', 'ConsumptionPredictor', 'ModelManager']
+__all__ = ['AnomalyDetector', 'ModelManager']
