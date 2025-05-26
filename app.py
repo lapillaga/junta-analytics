@@ -1,8 +1,11 @@
+import json
 import logging
 import os
 import sys
+import traceback
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
@@ -41,6 +44,15 @@ viz_helper = None
 model_manager = None
 merged_data = None
 consumption_data = None
+
+def _to_serializable(obj):
+    """Convierte tipos de NumPy a tipos nativos de Python."""
+    if isinstance(obj, np.generic):       # bool_, int64, float64…
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    # Deja que json trate de serializar lo demás o lance error
+    raise TypeError(f"{type(obj)} is not JSON serializable")
 
 
 def initialize_app():
@@ -131,17 +143,6 @@ def get_dashboard_data():
         timeline_chart = viz_helper.create_rainfall_consumption_timeline(
             merged_data)
         correlation_chart = viz_helper.create_correlation_scatter(merged_data)
-        seasonal_heatmap = viz_helper.create_seasonal_heatmap(merged_data)
-
-        # Get neighborhood data if available
-        neighborhood_chart = None
-        try:
-            neighborhood_data = db_manager.get_neighborhoods_stats()
-            if len(neighborhood_data) > 0:
-                neighborhood_chart = viz_helper.create_neighborhood_consumption(
-                    neighborhood_data)
-        except Exception as e:
-            logger.warning(f"Could not load neighborhood data: {e}")
 
         # Create KPI cards
         kpi_cards = viz_helper.create_kpi_cards(stats)
@@ -159,22 +160,12 @@ def get_dashboard_data():
             prediction_chart = viz_helper.create_consumption_prediction_chart(
                 historical, predictions)
 
-        # Risk classification data (sample)
-        risk_data = pd.DataFrame({
-            'risk_level': ['Low Risk'] * 5 + ['Normal'] * 10 + [
-                'High Risk'] * 3
-        })
-        risk_chart = viz_helper.create_risk_classification_chart(risk_data)
-
         response_data = {
             'kpi_cards': kpi_cards,
             'charts': {
                 'timeline': timeline_chart,
                 'correlation': correlation_chart,
-                'seasonal_heatmap': seasonal_heatmap,
-                'neighborhood': neighborhood_chart,
-                'prediction': prediction_chart,
-                'risk_classification': risk_chart
+                'prediction': prediction_chart
             },
             'stats': stats,
             'last_updated': datetime.now().isoformat()
@@ -217,6 +208,7 @@ def detect_anomaly():
         try:
             anomaly_detector = model_manager.get_model('anomaly_detector')
         except:
+            print("Anomaly detector model not found")
             # If no trained model, use statistical approach
             if consumption_data is None:
                 return jsonify({
@@ -228,8 +220,9 @@ def detect_anomaly():
             result = stat_detector.detect_anomaly(
                 water_meter_id, current_reading, previous_reading, days_billed
             )
+            cleaned = json.loads(json.dumps(result, default=_to_serializable))
 
-            return jsonify(result)
+            return jsonify(cleaned)
 
         # Use ML-based anomaly detector
         result = anomaly_detector.detect_single_reading(
@@ -240,12 +233,16 @@ def detect_anomaly():
             historical_data=consumption_data
         )
 
-        return jsonify(result)
+        cleaned = json.loads(json.dumps(result, default=_to_serializable))
+
+        return jsonify(cleaned)
 
     except ValueError as e:
         return jsonify({'error': f'Invalid input: {str(e)}'}), 400
     except Exception as e:
         logger.error(f"Error in anomaly detection: {e}")
+        # Show traceback in logs
+        traceback.print_exc()
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 

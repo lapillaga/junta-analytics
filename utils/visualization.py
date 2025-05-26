@@ -27,7 +27,7 @@ class VisualizationHelper:
 
         fig = make_subplots(
             specs=[[{"secondary_y": True}]],
-            subplot_titles=["Monthly Rainfall vs Water Consumption"]
+            subplot_titles=["Lluvia Mensual vs Consumo de Agua"]
         )
 
         # Add consumption line
@@ -35,7 +35,7 @@ class VisualizationHelper:
             go.Scatter(
                 x=data['period_dt'],
                 y=data['avg_consumption'],
-                name='Avg Consumption (m³)',
+                name='Consumo Promedio (m³)',
                 line=dict(color='#1f77b4', width=3),
                 mode='lines+markers',
                 marker=dict(size=6)
@@ -48,7 +48,7 @@ class VisualizationHelper:
             go.Scatter(
                 x=data['period_dt'],
                 y=data['avg_rainfall'],
-                name='Avg Rainfall (mm)',
+                name='Lluvia Promedio (mm)',
                 line=dict(color='#2ca02c', width=3),
                 mode='lines+markers',
                 marker=dict(size=6)
@@ -58,22 +58,22 @@ class VisualizationHelper:
 
         # Set y-axes titles
         fig.update_yaxes(
-            title_text="Water Consumption (m³)",
+            title_text="Consumo de Agua (m³)",
             secondary_y=False,
         )
         fig.update_yaxes(
-            title_text="Rainfall (mm)",
+            title_text="Lluvia (mm)",
             secondary_y=True,
         )
 
         # Update layout
         fig.update_layout(
             title={
-                'text': 'Temporal Correlation: Rainfall vs Water Consumption',
+                'text': 'Correlación Temporal: Lluvia vs Consumo de Agua',
                 'x': 0.5,
                 'font': {'size': self.theme['title_font_size']}
             },
-            xaxis_title='Period',
+            xaxis_title='Período',
             hovermode='x unified',
             legend=dict(
                 orientation="h",
@@ -85,7 +85,9 @@ class VisualizationHelper:
             paper_bgcolor=self.theme['paper_bgcolor'],
             plot_bgcolor=self.theme['background_color'],
             font={'family': self.theme['font_family'],
-                  'size': self.theme['font_size']}
+                  'size': self.theme['font_size']},
+            autosize=True,
+            margin=dict(l=40, r=20, t=80, b=40)
         )
 
         return fig.to_json()
@@ -140,120 +142,12 @@ class VisualizationHelper:
 
         fig.update_layout(
             title={
-                'text': f'Rainfall vs Consumption Correlation (r = {correlation:.3f})',
+                'text': f'Correlación Lluvia vs Consumo (r = {correlation:.3f})',
                 'x': 0.5,
                 'font': {'size': self.theme['title_font_size']}
             },
-            xaxis_title='Average Rainfall (mm)',
-            yaxis_title='Average Consumption (m³)',
-            paper_bgcolor=self.theme['paper_bgcolor'],
-            plot_bgcolor=self.theme['background_color'],
-            font={'family': self.theme['font_family'],
-                  'size': self.theme['font_size']}
-        )
-
-        return fig.to_json()
-
-    def create_seasonal_heatmap(self, data: pd.DataFrame) -> str:
-        """Create heatmap showing consumption patterns by month and rainfall intensity"""
-
-        # Create month and rainfall intensity columns if not exist
-        if 'month' not in data.columns:
-            data['month'] = pd.to_datetime(data['period_str']).dt.month
-
-        # Create rainfall intensity bins
-        data['rainfall_bin'] = pd.cut(
-            data['avg_rainfall'],
-            bins=5,
-            labels=['Very Low', 'Low', 'Medium', 'High', 'Very High']
-        )
-
-        # Create pivot table
-        heatmap_data = data.pivot_table(
-            values='avg_consumption',
-            index='rainfall_bin',
-            columns='month',
-            aggfunc='mean'
-        ).round(1)
-
-        # Create heatmap
-        fig = go.Figure(
-            data=go.Heatmap(
-                z=heatmap_data.values,
-                x=[f'Month {i}' for i in heatmap_data.columns],
-                y=heatmap_data.index,
-                colorscale='RdYlBu_r',
-                hoverongaps=False,
-                hovertemplate=(
-                    '<b>Month:</b> %{x}<br>'
-                    '<b>Rainfall Level:</b> %{y}<br>'
-                    '<b>Avg Consumption:</b> %{z:.1f} m³<br>'
-                    '<extra></extra>'
-                )
-            )
-        )
-
-        fig.update_layout(
-            title={
-                'text': 'Consumption Patterns by Month and Rainfall Intensity',
-                'x': 0.5,
-                'font': {'size': self.theme['title_font_size']}
-            },
-            xaxis_title='Month',
-            yaxis_title='Rainfall Intensity',
-            paper_bgcolor=self.theme['paper_bgcolor'],
-            font={'family': self.theme['font_family'],
-                  'size': self.theme['font_size']}
-        )
-
-        return fig.to_json()
-
-    def create_neighborhood_consumption(self,
-                                        neighborhood_data: pd.DataFrame) -> str:
-        """Create bar chart of consumption by neighborhood"""
-
-        # Aggregate data by neighborhood
-        neighborhood_stats = neighborhood_data.groupby(
-            'neighborhood_name').agg({
-            'total_consumption': 'sum',
-            'avg_consumption': 'mean',
-            'active_meters': 'sum'
-        }).reset_index()
-
-        # Calculate consumption per meter
-        neighborhood_stats['consumption_per_meter'] = (
-            neighborhood_stats['total_consumption'] / neighborhood_stats[
-            'active_meters']
-        )
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Bar(
-                x=neighborhood_stats['neighborhood_name'],
-                y=neighborhood_stats['consumption_per_meter'],
-                name='Consumption per Meter',
-                marker_color='lightblue',
-                hovertemplate=(
-                    '<b>Neighborhood:</b> %{x}<br>'
-                    '<b>Consumption per Meter:</b> %{y:.1f} m³<br>'
-                    '<b>Total Meters:</b> %{customdata[0]}<br>'
-                    '<b>Total Consumption:</b> %{customdata[1]:.1f} m³<br>'
-                    '<extra></extra>'
-                ),
-                customdata=neighborhood_stats[
-                    ['active_meters', 'total_consumption']].values
-            )
-        )
-
-        fig.update_layout(
-            title={
-                'text': 'Average Consumption per Meter by Neighborhood',
-                'x': 0.5,
-                'font': {'size': self.theme['title_font_size']}
-            },
-            xaxis_title='Neighborhood',
-            yaxis_title='Consumption per Meter (m³)',
+            xaxis_title='Promedio de Lluvia (mm)',
+            yaxis_title='Promedio de Consumo (m³)',
             paper_bgcolor=self.theme['paper_bgcolor'],
             plot_bgcolor=self.theme['background_color'],
             font={'family': self.theme['font_family'],
@@ -425,25 +319,25 @@ class VisualizationHelper:
         kpi_data = {
             'total_periods': {
                 'value': stats.get('total_periods', 0),
-                'title': 'Analysis Periods',
+                'title': 'Periodos Totales',
                 'icon': 'calendar',
                 'color': 'primary'
             },
             'avg_consumption': {
                 'value': f"{stats.get('consumption_stats', {}).get('mean', 0):.1f}",
-                'title': 'Avg Monthly Consumption (m³)',
+                'title': 'Promedio Consumo Mensual (m³)',
                 'icon': 'droplet',
                 'color': 'info'
             },
             'avg_rainfall': {
                 'value': f"{stats.get('rainfall_stats', {}).get('mean', 0):.1f}",
-                'title': 'Avg Monthly Rainfall (mm)',
+                'title': 'Promedio Lluvia Mensual (mm)',
                 'icon': 'cloud-rain',
                 'color': 'success'
             },
             'correlation': {
                 'value': f"{stats.get('correlation', {}).get('rainfall_consumption', 0):.3f}",
-                'title': 'Rainfall-Consumption Correlation',
+                'title': 'Correlation entre Lluvia y Consumo',
                 'icon': 'trending-up',
                 'color': 'warning' if abs(
                     stats.get('correlation', {}).get('rainfall_consumption',
@@ -531,49 +425,15 @@ class VisualizationHelper:
                 </div>
             </div>
 
-            <!-- Secondary Charts Row -->
+            <!-- Predictions Row -->
             <div class="row mb-4">
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Seasonal Patterns</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="seasonal-heatmap" style="height: 350px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Neighborhood Analysis</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="neighborhood-chart" style="height: 350px;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Predictions and Anomalies Row -->
-            <div class="row mb-4">
-                <div class="col-lg-6">
+                <div class="col-lg-12">
                     <div class="card">
                         <div class="card-header">
                             <h5 class="card-title mb-0">Consumption Predictions</h5>
                         </div>
                         <div class="card-body">
-                            <div id="prediction-chart" style="height: 350px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Risk Classification</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="risk-chart" style="height: 350px;"></div>
+                            <div id="prediction-chart" style="height: 400px;"></div>
                         </div>
                     </div>
                 </div>

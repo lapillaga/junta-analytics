@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Water Management AI{% endblock %}
+{% block title %}Panel de Control - Gestión de Agua IA{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -8,55 +8,55 @@
         <div class="d-flex justify-content-between align-items-center">
             <h1 class="h3 mb-0">
                 <i class="fas fa-chart-line text-primary"></i>
-                Water Management Dashboard
+                Panel de Gestión de Agua
             </h1>
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
-                    <i class="fas fa-sync-alt"></i> Refresh
+                    <i class="fas fa-sync-alt"></i> Actualizar
                 </button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportData()">
-                    <i class="fas fa-download"></i> Export
+                    <i class="fas fa-download"></i> Exportar
                 </button>
             </div>
         </div>
         <p class="text-muted mb-0">
-            Real-time insights for rural water consumption and rainfall analysis
+            Información en tiempo real sobre consumo de agua rural y análisis de precipitaciones
         </p>
     </div>
 </div>
 
-<!-- Loading State -->
+<!-- Estado de Carga -->
 <div id="loading-state" class="text-center py-5">
     <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading dashboard data...</span>
+        <span class="visually-hidden">Cargando datos del panel...</span>
     </div>
-    <p class="mt-3">Loading dashboard data...</p>
+    <p class="mt-3">Cargando datos del panel...</p>
 </div>
 
-<!-- Error State -->
+<!-- Estado de Error -->
 <div id="error-state" class="alert alert-danger" style="display: none;">
     <h5 class="alert-heading">
-        <i class="fas fa-exclamation-triangle"></i> Error Loading Dashboard
+        <i class="fas fa-exclamation-triangle"></i> Error al Cargar el Panel
     </h5>
     <p id="error-message"></p>
     <button class="btn btn-outline-danger btn-sm" onclick="refreshDashboard()">
-        <i class="fas fa-redo"></i> Try Again
+        <i class="fas fa-redo"></i> Reintentar
     </button>
 </div>
 
-<!-- Main Dashboard Content -->
+<!-- Contenido Principal del Panel -->
 <div id="dashboard-content" style="display: none;">
-    <!-- KPI Cards will be inserted here -->
+    <!-- Tarjetas KPI -->
     <div id="kpi-cards-container"></div>
 
-    <!-- Main Charts -->
+    <!-- Gráficos Principales -->
     <div class="row mb-4">
         <div class="col-lg-8">
             <div class="card chart-card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="fas fa-chart-line"></i>
-                        Rainfall vs Consumption Timeline
+                        Línea de Tiempo: Precipitación vs Consumo
                     </h5>
                 </div>
                 <div class="card-body">
@@ -69,7 +69,7 @@
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="fas fa-scatter-chart"></i>
-                        Correlation Analysis
+                        Análisis de Correlación
                     </h5>
                 </div>
                 <div class="card-body">
@@ -79,44 +79,14 @@
         </div>
     </div>
 
-    <!-- Secondary Charts -->
-    <div class="row mb-4">
-        <div class="col-lg-6">
-            <div class="card chart-card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-calendar-alt"></i>
-                        Seasonal Patterns
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div id="seasonal-heatmap" class="chart-container"></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card chart-card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-map-marker-alt"></i>
-                        Neighborhood Analysis
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div id="neighborhood-chart" class="chart-container"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Predictions and Risk -->
+    <!-- Predicciones y Riesgo -->
     <div class="row mb-4">
         <div class="col-lg-6">
             <div class="card chart-card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
                         <i class="fas fa-crystal-ball"></i>
-                        Consumption Predictions
+                        Predicciones de Consumo
                     </h5>
                 </div>
                 <div class="card-body">
@@ -124,32 +94,19 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-6">
-            <div class="card chart-card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Risk Classification
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div id="risk-chart" class="chart-container"></div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Anomaly Detection Section -->
+    <!-- Sección de Detección de Anomalías -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
                         <i class="fas fa-search"></i>
-                        Anomaly Detection
+                        Detección de Anomalías
                     </h5>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#anomalyTestModal">
-                        <i class="fas fa-plus"></i> Test New Reading
+                        <i class="fas fa-plus"></i> Probar Nueva Lectura
                     </button>
                 </div>
                 <div class="card-body">
@@ -159,9 +116,9 @@
                         </div>
                         <div class="col-lg-4">
                             <div id="recent-anomalies">
-                                <h6>Recent Anomalies</h6>
+                                <h6>Anomalías Recientes</h6>
                                 <div id="anomaly-list">
-                                    <!-- Anomaly list will be populated here -->
+                                    <!-- La lista de anomalías se poblará aquí -->
                                 </div>
                             </div>
                         </div>
@@ -171,63 +128,63 @@
         </div>
     </div>
 
-    <!-- Last Updated Info -->
+    <!-- Información de Última Actualización -->
     <div class="row">
         <div class="col-12">
             <div class="text-center text-muted">
                 <small>
                     <i class="fas fa-clock"></i>
-                    Last updated: <span id="last-updated">Never</span>
+                    Última actualización: <span id="last-updated">Nunca</span>
                 </small>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Anomaly Test Modal -->
+<!-- Modal de Prueba de Anomalías -->
 <div class="modal fade" id="anomalyTestModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-search"></i> Test Anomaly Detection
+                    <i class="fas fa-search"></i> Probar Detección de Anomalías
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="anomaly-test-form">
                     <div class="mb-3">
-                        <label for="meter-id" class="form-label">Water Meter ID</label>
+                        <label for="meter-id" class="form-label">ID del Medidor de Agua</label>
                         <input type="number" class="form-control" id="meter-id" required
-                               placeholder="Enter meter ID">
+                               placeholder="Ingrese el ID del medidor">
                     </div>
                     <div class="mb-3">
-                        <label for="previous-reading" class="form-label">Previous Reading</label>
+                        <label for="previous-reading" class="form-label">Lectura Anterior</label>
                         <input type="number" class="form-control" id="previous-reading" required
-                               placeholder="Enter previous reading">
+                               placeholder="Ingrese la lectura anterior">
                     </div>
                     <div class="mb-3">
-                        <label for="current-reading" class="form-label">Current Reading</label>
+                        <label for="current-reading" class="form-label">Lectura Actual</label>
                         <input type="number" class="form-control" id="current-reading" required
-                               placeholder="Enter current reading">
+                               placeholder="Ingrese la lectura actual">
                     </div>
                     <div class="mb-3">
-                        <label for="days-billed" class="form-label">Days Billed</label>
+                        <label for="days-billed" class="form-label">Días Facturados</label>
                         <input type="number" class="form-control" id="days-billed" value="30" required>
                     </div>
                 </form>
 
-                <!-- Results -->
+                <!-- Resultados -->
                 <div id="anomaly-result" style="display: none;">
                     <hr>
-                    <h6>Detection Result:</h6>
+                    <h6>Resultado de la Detección:</h6>
                     <div id="anomaly-result-content"></div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="testAnomaly()">
-                    <i class="fas fa-search"></i> Detect Anomaly
+                    <i class="fas fa-search"></i> Detectar Anomalía
                 </button>
             </div>
         </div>

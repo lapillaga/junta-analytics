@@ -349,6 +349,8 @@ class ModelManager:
         Returns:
             Model instance
         """
+        print(f'Getting model of type: {model_type}')
+        print(f'Models in memory: {self.models.keys()}')
         if model_type not in self.models:
             raise ValueError(
                 f"Model {model_type} not found. Train or load model first.")
