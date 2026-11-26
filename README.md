@@ -348,6 +348,25 @@ pytest
 
 ---
 
+## Pull requests
+
+Un PR se fusiona solo con la aprobación de la revisión de Claude
+(`.github/workflows/claude-code-review.yml`, que revisa contra este README y `REVIEW.md`). Antes de
+fusionar:
+
+1. Espere a que terminen todos los checks, incluido `claude-review`.
+2. Lea el último comentario de la revisión. Aprueba cuando el comentario existe y no deja hallazgos
+   bloqueantes ni observaciones sin respuesta. Un check en verde no basta: sin el secreto, el job pasa
+   sin revisar.
+3. Atienda cada hallazgo u observación: corríjalo o responda en el PR por qué no aplica.
+4. Después de una corrección, pida otra revisión con un comentario `/review` en el PR (un push no la
+   dispara) y vuelva al paso 1.
+5. Si la revisión no corre o falla dos veces, un mantenedor decide y deja la decisión escrita en el PR.
+
+Esto vale para todos los PR, también los que solo cambian documentación.
+
+---
+
 ## 📄 **Licencia**
 
 Este proyecto está bajo la licencia MIT. Ver el archivo [LICENSE](LICENSE) para más detalles.
